@@ -1,110 +1,44 @@
 #!/bin/bash
-# tmux-goto-level - Navigate to specific level in 9-level system
+# tmux-goto-level — Navigate to a specific level (1-9)
 # Usage: tmux-goto-level <1-9>
 
 set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Source configuration
-CONFIG_FILE="$HOME/.local/bin/tmux-multilevel/config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
+[[ $# -eq 1 ]] || die "Usage: tmux-goto-level <1-9>"
+[[ "$1" =~ ^[1-9]$ ]] || die "Level must be 1-9, got '$1'"
+target="$1"
+
+# Step 1: Update global navigation state
+tmux set-option -g @active_level "$target" 2>/dev/null || die "Failed to set @active_level"
+tmux display-message "Navigating to Level $target..." 2>/dev/null || true
+
+# Step 2: Re-evaluate every session — activate matching, passthrough the rest
+activated=0  passthrough=0
+while IFS= read -r session; do
+    [[ -n "$session" ]] || continue
+    level=$(detect_session_level "$session")
+
+    if [[ "$level" -eq "$target" ]]; then
+        if tmux set-option -t "$session" prefix "$PRIMARY_PREFIX" 2>/dev/null &&
+           tmux set-option -t "$session" key-table root 2>/dev/null; then
+            activated=$((activated + 1))
+        fi
+    else
+        if tmux set-option -t "$session" prefix "$SECONDARY_PREFIX" 2>/dev/null &&
+           tmux set-option -t "$session" key-table off 2>/dev/null; then
+            passthrough=$((passthrough + 1))
+        fi
+    fi
+done < <(tmux list-sessions -F '#S' 2>/dev/null || true)
+
+# Step 3: Feedback
+if [[ $activated -eq 0 ]]; then
+    tmux display-message "Level $target: no sessions (use tmux-start-level $target)" 2>/dev/null || true
 else
-    # Fallback to defaults if config doesn't exist
-    PRIMARY_PREFIX="C-x"
-    SECONDARY_PREFIX="C-a"
+    tmux display-message "Level $target active ($activated active, $passthrough passthrough)" 2>/dev/null || true
 fi
 
-show_error() {
-    echo "❌ $1" >&2
-    # Clear any status styling
-    tmux set-option -u status-style 2>/dev/null || true
-}
-
-# Input validation
-validate_level() {
-    case "$1" in
-        [1-9]) return 0 ;;
-        *) return 1 ;;
-    esac
-}
-
-# Session detection function
-detect_session_level() {
-    local session_name="${1:-$(tmux display-message -p '#S' 2>/dev/null || echo '')}"
-    if [[ -z "$session_name" ]]; then
-        echo "1"
-        return
-    fi
-    
-    local level
-    level=$(tmux show-option -t "$session_name" @session_level 2>/dev/null | cut -d' ' -f2 || echo "1")
-    echo "$level"
-}
-
-# Main function - implements manual re-evaluation for 9-level system
-main() {
-    if [[ $# -ne 1 ]]; then
-        show_error "Usage: tmux-goto-level <1-9>"
-        exit 1
-    fi
-
-    local target_level="$1"
-    
-    if ! validate_level "$target_level"; then
-        show_error "Level must be 1-9, got '$target_level'"
-        exit 1
-    fi
-    
-    # Step 1: Update global navigation state
-    if ! tmux set-option -g @active_level "$target_level" 2>/dev/null; then
-        show_error "Failed to set global active level"
-        exit 1
-    fi
-    
-    # Display navigation message in tmux status
-    tmux display-message "🔄 Navigating to Level $target_level..." 2>/dev/null || true
-    
-    # Step 2: Manual re-evaluation of ALL sessions
-    local activated_count=0
-    local passthrough_count=0
-    
-    # Process each session
-    while IFS= read -r session_name; do
-        # Skip if session_name is empty
-        [[ -n "$session_name" ]] || continue
-        
-        # Get this session's level identity
-        local session_level
-        session_level=$(detect_session_level "$session_name")
-        
-        if [[ $session_level -eq $target_level ]]; then
-            # ACTIVATE: This session should respond to tmux commands
-            if tmux set-option -t "$session_name" prefix $PRIMARY_PREFIX 2>/dev/null && \
-               tmux set-option -t "$session_name" key-table root 2>/dev/null; then
-                activated_count=$((activated_count + 1))
-            fi
-        else
-            # PASSTHROUGH: This session uses secondary prefix to avoid conflicts with active sessions
-            if tmux set-option -t "$session_name" prefix $SECONDARY_PREFIX 2>/dev/null && \
-               tmux set-option -t "$session_name" key-table off 2>/dev/null; then
-                passthrough_count=$((passthrough_count + 1))
-            fi
-        fi
-    done < <(tmux list-sessions -F '#S' 2>/dev/null || true)
-    
-    # Step 3: Provide feedback via display-message
-    if [[ $activated_count -eq 0 ]]; then
-        tmux display-message "📝 Level $target_level: No sessions found (use tmux-start-level $target_level)" 2>/dev/null || true
-    else
-        tmux display-message "🎯 Level $target_level Active ($activated_count active, $passthrough_count passthrough)" 2>/dev/null || true
-    fi
-    
-    # Step 4: Refresh status bar
-    tmux refresh-client -S 2>/dev/null || true
-    
-    # Step 5: Save state for persistence
-    echo "$target_level" > ~/.tmux_level_state 2>/dev/null || true
-}
-
-# Run main function
-main "$@"
+# Step 4: Refresh & persist
+tmux refresh-client -S 2>/dev/null || true
+echo "$target" > ~/.tmux_level_state 2>/dev/null || true

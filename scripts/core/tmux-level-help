@@ -1,38 +1,28 @@
 #!/bin/bash
-# tmux-level-help - Show escape commands for current level
+# tmux-level-help — Show navigation commands for current level
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Source configuration
-CONFIG_FILE="$HOME/.local/bin/tmux-multilevel/config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-else
-    # Fallback to defaults if config doesn't exist
-    PRIMARY_PREFIX="C-x"
-    SECONDARY_PREFIX="C-a"
-fi
+level=$(active_level)
+key="${PRIMARY_PREFIX#*-}"
 
-current_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
+cat << EOF
+=== TMUX LEVEL $level HELP ===
+Primary Prefix: $PRIMARY_PREFIX (active sessions)
+Secondary Prefix: $SECONDARY_PREFIX (passthrough)
 
-# Extract the key letter from the prefix (e.g., C-x -> x, M-a -> a)
-primary_key="${PRIMARY_PREFIX#*-}"
-secondary_key="${SECONDARY_PREFIX#*-}"
+NAVIGATION:
+  $PRIMARY_PREFIX !       → Jump to Level 1
+  Ctrl+B         → Up one level
+  Ctrl+N         → Down one level
+  $PRIMARY_PREFIX x       → Copy mode
 
-echo "=== TMUX LEVEL $current_level HELP ==="
-echo "Primary Prefix: $PRIMARY_PREFIX (active sessions)"
-echo "Secondary Prefix: $SECONDARY_PREFIX (passthrough)"
-echo ""
-echo "ESCAPE COMMANDS:"
-echo "  $PRIMARY_PREFIX !        → Jump to Level 1"
-echo "  Ctrl+B          → Up one level"
-echo "  Ctrl+N          → Down one level"
-echo "  $PRIMARY_PREFIX x        → Copy mode (preserved)"
-echo ""
-echo "DIRECT JUMPS:"
-echo "  $PRIMARY_PREFIX ! @ # $ % ^ & * ( → Levels 1-9"
-echo ""
-echo "STATUS BAR FORMATS:"
-echo "  tmux-level-status --visual   → [L3:$primary_key ●●●○○○○○○]"
-echo "  tmux-level-status --compact  → [L3:$primary_key]"
-echo "  tmux-level-status --help     → Show format options"
-echo ""
-echo "If stuck, run: ~/.local/bin/tmux-multilevel/core/tmux-level-reset"
+DIRECT JUMPS:
+  $PRIMARY_PREFIX ! @ # \$ % ^ & * ( → Levels 1-9
+
+STATUS BAR:
+  tmux-level-status --visual   → [L3:$key ●●●○○○○○○]
+  tmux-level-status --compact  → [L3:$key]
+  tmux-level-status --help     → Format options
+
+If stuck: $DMT_DIR/core/tmux-level-reset
+EOF

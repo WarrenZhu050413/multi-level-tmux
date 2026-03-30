@@ -1,146 +1,70 @@
 #!/bin/bash
-# tmux-start-level - Start tmux session with level identity (9-level system)
-# Usage: tmux-start-level <1-9> [tmux-new-session-options...]
+# tmux-start-level — Start tmux session with level identity (1-9)
+# Usage: tmux-start-level [level] [tmux-new-session-options...]
 
 set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Source configuration
-CONFIG_FILE="$HOME/.local/bin/tmux-multilevel/config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-else
-    # Fallback to defaults if config doesn't exist
-    PRIMARY_PREFIX="C-x"
-    SECONDARY_PREFIX="C-a"
-fi
-
-show_help() {
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat << 'EOF'
-tmux-start-level - Start tmux session with level identity (9-level system)
+tmux-start-level — Start tmux session with level identity (1-9)
 
 USAGE:
     tmux-start-level [level] [tmux-options...]
 
 ARGUMENTS:
-    level               Session identity level (1-9) - auto-increments if omitted
-    tmux-options       Any flags supported by 'tmux new-session'
+    level           Session level (1-9); auto-increments from parent if omitted
+    tmux-options    Any flags for 'tmux new-session'
 
 EXAMPLES:
-    tmux-start-level                            # Auto-select next available level
-    tmux-start-level 1                          # Basic Level 1 session
-    tmux-start-level 2 -s project               # Named Level 2 session  
-    tmux-start-level 3 -s work -c ~/projects    # Level 3, named, specific directory
-    tmux-start-level -s myproject               # Auto-level with session name
-    tmux-start-level -d -s background           # Auto-level, detached session
-    tmux-start-level 1 -A -s workspace          # Level 1, attach if exists
+    tmux-start-level                           # Auto-select next level
+    tmux-start-level 1                         # Basic Level 1 session
+    tmux-start-level 2 -s project              # Named Level 2 session
+    tmux-start-level 3 -s work -c ~/projects   # Level 3, named, specific dir
+    tmux-start-level -s myproject              # Auto-level with session name
 
 NOTES:
-    - Auto-increment finds the next unused level (1-9)
-    - Sets @session_level variable for session identity
-    - All tmux new-session options are supported and passed through
-    - Sessions start in passthrough mode, use navigation to activate
-    - Use configured prefix (!@#$%^&*() to navigate to levels 1-9
-
-SEE ALSO:
-    tmux-goto-level     Switch navigation to specific level
-    tmux-level-help     Show navigation commands
-    tmux new-session    Native tmux session creation
+    - Sessions start in passthrough mode; use navigation to activate
+    - Use prefix + !@#$%^&*( to navigate to levels 1-9
 EOF
-}
-
-# Show help
-if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
-    show_help
     exit 0
 fi
 
-# Function to find next level (simple increment from parent)
+# Auto-detect next level from parent session
 find_next_level() {
-    # First, get the parent session's level if we're inside tmux
-    local parent_level="0"  # Default to L0 if no parent level
+    local parent=0
     if [[ -n "${TMUX:-}" ]]; then
-        # We're inside a tmux session, get its level
-        local parent_session
-        parent_session=$(tmux display-message -p '#S' 2>/dev/null || echo '')
-        if [[ -n "$parent_session" ]]; then
-            local detected_level
-            detected_level=$(tmux show-option -t "$parent_session" @session_level 2>/dev/null | cut -d' ' -f2 || echo "")
-            # Only use detected level if it's a valid number 1-9
-            if [[ "$detected_level" =~ ^[1-9]$ ]]; then
-                parent_level="$detected_level"
-            fi
+        local session
+        session=$(tmux display-message -p '#S' 2>/dev/null || echo '')
+        if [[ -n "$session" ]]; then
+            local detected
+            detected=$(detect_session_level "$session")
+            [[ "$detected" =~ ^[1-9]$ ]] && parent="$detected"
         fi
     fi
-    
-    # Simply increment parent level (with wrapping at 9)
-    echo $(( (parent_level % 9) + 1 ))
+    echo $(( (parent % 9) + 1 ))
 }
 
-# Check if first argument is a level number or tmux option
-level=""
-if [[ $# -eq 0 ]]; then
-    # No arguments at all, auto-select level
+# Parse level: explicit first arg, or auto-increment
+if [[ $# -gt 0 && "$1" =~ ^[1-9]$ ]]; then
+    level="$1"; shift
+else
     level=$(find_next_level)
-    if [[ -n "${TMUX:-}" ]]; then
-        parent_session=$(tmux display-message -p '#S' 2>/dev/null || echo '')
-        parent_level=$(tmux show-option -t "$parent_session" @session_level 2>/dev/null | cut -d' ' -f2 || echo "")
-        if [[ "$parent_level" =~ ^[1-9]$ ]]; then
-            echo "🎯 Auto-selecting Level $level (parent L${parent_level} → L${level})"
-        else
-            echo "🎯 Auto-selecting Level $level (parent L0 → L${level})"
-        fi
-    else
-        echo "🎯 Auto-selecting Level $level (not in tmux → L${level})"
-    fi
-elif [[ "$1" =~ ^[1-9]$ ]]; then
-    # First argument is a level number
-    level=$1
-    shift  # Remove level from arguments
+    echo "Auto-selecting Level $level"
+fi
+
+# Determine prefix based on current active level
+current_active=$(active_level)
+if [[ "$level" -eq "$current_active" ]]; then
+    prefix="$PRIMARY_PREFIX"; table="root"
+    echo "Starting Level $level session (ACTIVE)"
 else
-    # First argument is a tmux option, auto-select level
-    level=$(find_next_level)
-    if [[ -n "${TMUX:-}" ]]; then
-        parent_session=$(tmux display-message -p '#S' 2>/dev/null || echo '')
-        parent_level=$(tmux show-option -t "$parent_session" @session_level 2>/dev/null | cut -d' ' -f2 || echo "")
-        if [[ "$parent_level" =~ ^[1-9]$ ]]; then
-            echo "🎯 Auto-selecting Level $level (parent L${parent_level} → L${level})"
-        else
-            echo "🎯 Auto-selecting Level $level (parent L0 → L${level})"
-        fi
-    else
-        echo "🎯 Auto-selecting Level $level (not in tmux → L${level})"
-    fi
+    prefix="$SECONDARY_PREFIX"; table="off"
+    echo "Starting Level $level session (passthrough)"
 fi
 
-# Check if tmux is available
-if ! command -v tmux &> /dev/null; then
-    echo "❌ Error: tmux is not installed or not in PATH"
-    exit 1
-fi
-
-# Visual feedback
-echo "🚀 Starting Level $level tmux session..."
-
-# Get active level for configuration
-current_active_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
-
-if [[ $level -eq $current_active_level ]]; then
-    echo "✅ Creating Level $level session (ACTIVE - matches current level)"
-else
-    echo "✅ Creating Level $level session (passthrough mode)"
-fi
-
-# Start session directly (tmux handles nesting automatically)
-if [[ $level -eq $current_active_level ]]; then
-    exec tmux new-session "$@" \; \
-        set-option @session_level "$level" \; \
-        set-option status-right "#(TMUX_SESSION=#S ~/.local/bin/tmux-multilevel/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p" \; \
-        set-option prefix $PRIMARY_PREFIX \; \
-        set-option key-table root
-else
-    exec tmux new-session "$@" \; \
-        set-option @session_level "$level" \; \
-        set-option status-right "#(TMUX_SESSION=#S ~/.local/bin/tmux-multilevel/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p" \; \
-        set-option prefix $SECONDARY_PREFIX \; \
-        set-option key-table off
-fi
+exec tmux new-session "$@" \; \
+    set-option @session_level "$level" \; \
+    set-option status-right "#(TMUX_SESSION=#S $DMT_DIR/core/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p" \; \
+    set-option prefix "$prefix" \; \
+    set-option key-table "$table"

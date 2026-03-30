@@ -1,201 +1,102 @@
 #!/bin/bash
-
-# Create 4 git worktrees and open them in a 2x2 tmux session
+# worktree-tmux — Create 4 git worktrees in a 2x2 tmux session
 # Usage: worktree-tmux [--help] [namespace] [level]
-#   namespace: optional identifier (e.g., backend, frontend, feature1)
-#              defaults to timestamp if not provided
-#   level: tmux level number (1-9) for multilevel tmux support
 
 set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Source configuration
-CONFIG_FILE="$HOME/.local/bin/tmux-multilevel/config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-else
-    # Fallback to defaults if config doesn't exist
-    PRIMARY_PREFIX="C-x"
-    SECONDARY_PREFIX="C-a"
-fi
-
-show_help() {
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat << 'EOF'
-worktree-tmux - Create 4 git worktrees in a 2x2 tmux session with multilevel support
+worktree-tmux — Create 4 git worktrees in a 2x2 tmux session
 
 USAGE:
-    worktree-tmux [--help] [namespace] [level]
+    worktree-tmux [namespace] [level]
 
 ARGUMENTS:
-    namespace       Optional identifier for the worktrees (e.g., backend, frontend)
-                   Defaults to timestamp if not provided
-    level          Tmux level number (1-9) for multilevel tmux sessions
-                   If not provided, uses tmux-start-level auto-detection
+    namespace    Identifier for worktrees (default: timestamp)
+    level        Tmux level 1-9 (default: auto-detect from parent)
 
-CONFIGURATIONS:
-    • Creates 4 git worktrees:
-      - ../project-namespace-1 through ../project-namespace-4
-    • Each worktree gets its own branch:
-      - project-namespace-1 through project-namespace-4
-    • Opens in 2x2 tmux pane layout:
-      ┌─────────┬─────────┐
-      │ tree-1  │ tree-2  │
-      ├─────────┼─────────┤
-      │ tree-3  │ tree-4  │
-      └─────────┴─────────┘
-    • Uses tmux-start-level for multilevel tmux support
+LAYOUT:
+    ┌─────────┬─────────┐
+    │ tree-1  │ tree-2  │
+    ├─────────┼─────────┤
+    │ tree-3  │ tree-4  │
+    └─────────┴─────────┘
 
 EXAMPLES:
-    worktree-tmux                     # Auto namespace, auto level
-    worktree-tmux backend              # Named namespace, auto level
-    worktree-tmux backend 2            # Named namespace, explicit level 2
-    worktree-tmux $(date +%s) 3       # Timestamp namespace, level 3
-
-MULTILEVEL TMUX:
-    • Level auto-detection:
-      - Inside tmux: next level from current
-      - Outside tmux: Level 1
-    • Navigate levels with configured prefix then !@#$%^&*( for levels 1-9
-    • Each level maintains independent session state
-
-NOTES:
-    • Requires git repository
-    • Creates worktrees in parent directory
-    • Session name: project-namespace
-    • Cleans up worktrees on failure
-
-SEE ALSO:
-    tmux-start-level     Multilevel tmux session management
-    git worktree         Git worktree documentation
+    worktree-tmux backend        # Named namespace, auto level
+    worktree-tmux backend 2      # Named namespace, Level 2
 EOF
-}
-
-# Show help if requested
-if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
-    show_help
     exit 0
 fi
 
-# Check if we're in a git repository
-if ! git rev-parse --git-dir > /dev/null 2>&1; then
-  echo "Error: Not in a git repository"
-  exit 1
-fi
+git rev-parse --git-dir > /dev/null 2>&1 || die "Not in a git repository"
 
-# Parse arguments
 dir=$(basename "$PWD")
 namespace="${1:-$(date +%s)}"
-level="${2:-}"
+level_arg="${2:-}"
 session_name="${dir}-${namespace}"
 
-# Check if tmux session already exists
-if tmux has-session -t "$session_name" 2>/dev/null; then
-  echo "Error: tmux session '$session_name' already exists"
-  echo "Attach with: tmux attach -t $session_name"
-  exit 1
+tmux has-session -t "$session_name" 2>/dev/null &&
+    die "Session '$session_name' exists. Attach: tmux attach -t $session_name"
+
+# Cleanup helper for error paths
+cleanup_worktrees() {
+    for i in {1..4}; do
+        git worktree remove "../${dir}-${namespace}-$i" 2>/dev/null || true
+    done
+}
+
+# Determine level
+if [[ -n "$level_arg" ]]; then
+    [[ "$level_arg" =~ ^[1-9]$ ]] || { cleanup_worktrees; die "Level must be 1-9, got '$level_arg'"; }
+    new_level="$level_arg"
+else
+    if [[ -n "${TMUX:-}" ]]; then
+        parent=$(detect_session_level "$(tmux display-message -p '#S' 2>/dev/null)")
+        new_level=$((parent + 1))
+        [[ $new_level -le 9 ]] || { cleanup_worktrees; die "Already at Level 9"; }
+    else
+        new_level=1
+    fi
 fi
 
-# Create 4 worktrees with namespace
-echo "Creating worktrees with namespace '$namespace'..."
-for i in {1..4}; do 
-  branch_name="${dir}-${namespace}-$i"
-  worktree_path="../${dir}-${namespace}-$i"
-  
-  # Check if branch already exists
-  if git show-ref --verify --quiet "refs/heads/$branch_name"; then
-    echo "  Warning: Branch $branch_name already exists, using existing branch"
-    git worktree add "$worktree_path" "$branch_name"
-  else
-    echo "  Creating $worktree_path with branch $branch_name"
-    git worktree add "$worktree_path" -b "$branch_name"
-  fi
-  
-  if [ $? -ne 0 ]; then
-    echo "Error: Failed to create worktree $worktree_path"
-    echo "Cleaning up previously created worktrees..."
-    for j in $(seq 1 $((i-1))); do
-      git worktree remove "../${dir}-${namespace}-$j" 2>/dev/null
-    done
-    exit 1
-  fi
+# Create worktrees
+echo "Creating worktrees ($namespace)..."
+for i in {1..4}; do
+    branch="${dir}-${namespace}-$i"
+    path="../${dir}-${namespace}-$i"
+    if git show-ref --verify --quiet "refs/heads/$branch"; then
+        echo "  $path (existing branch)"
+        git worktree add "$path" "$branch"
+    else
+        echo "  $path (new branch)"
+        git worktree add "$path" -b "$branch"
+    fi
 done
 
-# Create tmux session with 2x2 layout
-echo "Creating tmux session '$session_name' with 2x2 pane layout..."
-
-# Determine the level for the new session
-if [[ -n "$level" ]]; then
-    # Validate level is 1-9
-    case "$level" in
-        [1-9]) 
-            new_level="$level"
-            echo "Using explicit Level $new_level for new tmux session"
-            ;;
-        *) 
-            echo "Error: Level must be 1-9, got '$level'"
-            # Clean up worktrees
-            for i in {1..4}; do
-                git worktree remove "../${dir}-${namespace}-$i" 2>/dev/null
-            done
-            exit 1
-            ;;
-    esac
-else
-    # Auto-detect level
-    if [[ -n "${TMUX:-}" ]]; then
-        # Inside tmux - detect current session level and increment
-        current_session=$(tmux display-message -p '#S')
-        current_level=$(tmux show-option -t "$current_session" @session_level 2>/dev/null | cut -d' ' -f2 || echo "1")
-        new_level=$((current_level + 1))
-        if [[ $new_level -gt 9 ]]; then
-            echo "Error: Already at maximum depth (Level 9)"
-            # Clean up worktrees
-            for i in {1..4}; do
-                git worktree remove "../${dir}-${namespace}-$i" 2>/dev/null
-            done
-            exit 1
-        fi
-        echo "  Detected current Level $current_level, creating new session at Level $new_level"
-    else
-        # Outside tmux - default to Level 1
-        new_level=1
-        echo "  No tmux detected, creating Level $new_level session"
-    fi
-fi
-
-# Create the new tmux session directly without using tmux-start-level
-# This ensures we don't modify the current session's level
+# Create session
+echo "Creating session '$session_name' at Level $new_level..."
 tmux new-session -d -s "$session_name" -c "../${dir}-${namespace}-1"
-
-# Set the session level for the new session only
 tmux set-option -t "$session_name" @session_level "$new_level"
+tmux set-option -t "$session_name" status-right \
+    "#(TMUX_SESSION=#S $DMT_DIR/core/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p"
 
-# Configure the status bar for the new session
-tmux set-option -t "$session_name" status-right "#(TMUX_SESSION=#S ~/.local/bin/tmux-multilevel/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p"
-
-# Set up the prefix key based on level (assuming level determines active/passive mode)
-# Get the current active level to determine if this new session should be active
-if [[ -n "${TMUX:-}" ]]; then
-    current_active_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
-    if [[ "$new_level" == "$current_active_level" ]]; then
-        # Active mode
-        tmux set-option -t "$session_name" prefix $PRIMARY_PREFIX
-        tmux set-option -t "$session_name" key-table root
-    else
-        # Passive mode - use secondary prefix to avoid conflicts with active sessions
-        tmux set-option -t "$session_name" prefix $SECONDARY_PREFIX
-        tmux set-option -t "$session_name" key-table off
-    fi
-else
-    # If not in tmux, set as active
-    tmux set-option -t "$session_name" prefix $PRIMARY_PREFIX
+# Set prefix based on active level
+current_active=$(active_level)
+if [[ "$new_level" == "$current_active" ]]; then
+    tmux set-option -t "$session_name" prefix "$PRIMARY_PREFIX"
     tmux set-option -t "$session_name" key-table root
+else
+    tmux set-option -t "$session_name" prefix "$SECONDARY_PREFIX"
+    tmux set-option -t "$session_name" key-table off
 fi
 
-# Create the 2x2 pane layout
-tmux split-window -h -t "${session_name}" -c "../${dir}-${namespace}-2"
+# 2x2 pane layout
+tmux split-window -h -t "$session_name" -c "../${dir}-${namespace}-2"
 tmux select-pane -t "${session_name}.0"
-tmux split-window -v -t "${session_name}" -c "../${dir}-${namespace}-3"
+tmux split-window -v -t "$session_name" -c "../${dir}-${namespace}-3"
 tmux select-pane -t "${session_name}.2"
-tmux split-window -v -t "${session_name}" -c "../${dir}-${namespace}-4"
-tmux select-layout -t "${session_name}" tiled
+tmux split-window -v -t "$session_name" -c "../${dir}-${namespace}-4"
+tmux select-layout -t "$session_name" tiled
 tmux attach-session -t "$session_name"

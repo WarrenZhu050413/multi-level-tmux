@@ -1,39 +1,14 @@
 #!/bin/bash
-# tmux-level-reset - Emergency reset to Level 1
-# Usage: tmux-level-reset
-
+# tmux-level-reset — Emergency reset to Level 1
 set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Source configuration
-CONFIG_FILE="$HOME/.local/bin/tmux-multilevel/config.sh"
-if [[ -f "$CONFIG_FILE" ]]; then
-    source "$CONFIG_FILE"
-else
-    # Fallback to defaults if config doesn't exist
-    PRIMARY_PREFIX="C-x"
-    SECONDARY_PREFIX="C-a"
-fi
+tmux set-option -g prefix "$PRIMARY_PREFIX" 2>/dev/null || true
+tmux set-option -g key-table root 2>/dev/null || true
+tmux set-option -g @active_level 1 2>/dev/null || true
+tmux set-option -u status-style 2>/dev/null || true
+tmux refresh-client -S 2>/dev/null || true
+echo 1 > ~/.tmux_level_state 2>/dev/null || true
 
-main() {
-    # Force reset to Level 1 (primary prefix, root key-table)
-    tmux set-option -g prefix $PRIMARY_PREFIX 2>/dev/null || true
-    tmux set-option -g key-table root 2>/dev/null || true
-    tmux set-option -g @active_level 1 2>/dev/null || true
-    tmux set-option -g @current_level 1 2>/dev/null || true
-    
-    # Clear any status bar overrides
-    tmux set-option -u status-style 2>/dev/null || true
-    
-    # Refresh display
-    tmux refresh-client -S 2>/dev/null || true
-    
-    # Save reset state
-    echo "1" > ~/.tmux_level_state 2>/dev/null || true
-    
-    # Confirmation message
-    tmux display-message "RESET: Level 1 - $PRIMARY_PREFIX" 2>/dev/null || {
-        echo "Reset to Level 1: $PRIMARY_PREFIX"
-    }
-}
-
-main "$@"
+tmux display-message "RESET: Level 1 — $PRIMARY_PREFIX" 2>/dev/null ||
+    echo "Reset to Level 1: $PRIMARY_PREFIX"

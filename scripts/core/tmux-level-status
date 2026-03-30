@@ -1,134 +1,63 @@
 #!/bin/bash
-# tmux-level-status - Format level indicator for status bar
+# tmux-level-status — Format level indicator for tmux status bar
 # Usage: tmux-level-status [--compact|--full|--minimal|--visual|--help]
 
 set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-# Show help
-if [[ ${1:-} == "--help" || ${1:-} == "-h" ]]; then
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat << 'EOF'
-tmux-level-status - Format level indicator for tmux status bar
-
-USAGE:
-    tmux-level-status [FORMAT]
+tmux-level-status — Format level indicator for tmux status bar
 
 FORMATS:
     --compact (default)  [session:L2 ✓] or [session:L2→L3]
-    --full              [session:L2:Ctrl+X ✓] or [session:L2→L3]
+    --full              [session:L2:Ctrl+X ✓]
     --minimal           [session:2✓] or [session:2→3]
-    --visual            [session:L2 ✓] [●●○○○○○○○] or [session:L2→L3] [●●○○○○○○○]
-    --help, -h          Show this help
+    --visual            [session:L2 ✓] [●●○○○○○○○]
 
-DUAL-STATE DISPLAY:
-    Active:     [session:L2 ✓] - This session is active (nav level matches)
-    Passthrough: [session:L2→L3] - Session L2, but navigation at L3
-
-EXAMPLES:
-    # Use in tmux status bar
+USAGE IN STATUS BAR:
     set-option -g status-right "#(tmux-level-status --visual) | %l:%M%p"
-    
-    # Test different formats
-    tmux-level-status --compact
-    tmux-level-status --visual
-
-SOOTHING COLOR PALETTE:
-    Active Session: Mint green (#[fg=colour156]) (harmony)
-    Passthrough: Soft blue (#[fg=colour67]) (inactive indication)
-
-SEE ALSO:
-    tmux-level-help     Show navigation commands for current level
-    tmux-goto-level     Switch to specific level
-    tmux-level-reset    Emergency reset to Level 1
 EOF
     exit 0
 fi
 
-# Session detection function (same as tmux-goto-level)
-detect_session_level() {
-    local session_name="${1:-$(tmux display-message -p '#S' 2>/dev/null || echo '')}"
-    if [[ -z "$session_name" ]]; then
-        echo "1"
-        return
-    fi
-    
-    local level
-    level=$(tmux show-option -t "$session_name" @session_level 2>/dev/null | cut -d' ' -f2 || echo "1")
-    echo "$level"
+session="${TMUX_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || echo default)}"
+slevel=$(detect_session_level "$session")
+alevel=$(active_level)
+is_active=$([[ "$slevel" == "$alevel" ]] && echo true || echo false)
+
+# Build visual dots: ●●●○○○○○○
+# Uses printf loop instead of tr — tr corrupts multi-byte UTF-8 chars
+dots() {
+    local i
+    for ((i = 0; i < $1; i++)); do printf '●'; done
+    for ((i = $1; i < 9; i++)); do printf '○'; done
 }
 
-main() {
-    # Get current session level and name
-    local session_level session_name
-    session_name="${TMUX_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || echo 'default')}"
-    session_level=$(detect_session_level "$session_name")
-    
-    # Get the global active navigation level
-    local active_level
-    active_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
-    
-    # Determine if this session is active (levels match)
-    local is_active=false
-    if [[ "$session_level" == "$active_level" ]]; then
-        is_active=true
-    fi
-    
-    # All levels use Ctrl+X prefix
-    local prefix_char="X"
-    
-    # Format options
-    local format_type="${1:-compact}"
-    local output=""
-    
-    case "$format_type" in
-        --compact|compact)
-            if [[ $is_active == true ]]; then
-                output="[${session_name}:L${session_level} ✓]"
-            else
-                output="[${session_name}:L${session_level}→L${active_level}]"
-            fi
-            ;;
-        --full|full)
-            if [[ $is_active == true ]]; then
-                output="[${session_name}:L${session_level}:Ctrl+${prefix_char} ✓]"
-            else
-                output="[${session_name}:L${session_level}→L${active_level}]"
-            fi
-            ;;
-        --minimal|minimal)
-            if [[ $is_active == true ]]; then
-                output="[${session_name}:${session_level}✓]"
-            else
-                output="[${session_name}:${session_level}→${active_level}]"
-            fi
-            ;;
-        --visual|visual)
-            # Visual dots showing the global active level
-            local filled=$(printf "%*s" "$active_level" "" | sed 's/ /●/g')
-            local empty=$(printf "%*s" $((9 - active_level)) "" | sed 's/ /○/g')
-            if [[ $is_active == true ]]; then
-                output="[${session_name}:L${session_level} ✓] [${filled}${empty}]"
-            else
-                output="[${session_name}:L${session_level}→L${active_level}] [${filled}${empty}]"
-            fi
-            ;;
-        *)
-            # Default to compact
-            if [[ $is_active == true ]]; then
-                output="[${session_name}:L${session_level} ✓]"
-            else
-                output="[${session_name}:L${session_level}→L${active_level}]"
-            fi
-            ;;
-    esac
-    
-    # Soothing color palette for 3-level system
-    if [[ $is_active == true ]]; then
-        # Session is active - use mint green (harmony)
-        echo "#[fg=colour156]${output}#[default]"  # Mint green for active sessions
-    else
-        # Session is in passthrough - use soft blue
-        echo "#[fg=colour67]${output}#[default]"  # Soft blue for passthrough indication
-    fi
-}
+format="${1:---compact}"
+# Use ${var} braces everywhere — bare $var before Unicode (→, ✓) confuses bash
+case "$format" in
+    --compact)
+        if $is_active; then out="[${session}:L${slevel} ✓]"
+        else out="[${session}:L${slevel}→L${alevel}]"; fi ;;
+    --full)
+        if $is_active; then out="[${session}:L${slevel}:Ctrl+${PRIMARY_PREFIX#C-} ✓]"
+        else out="[${session}:L${slevel}→L${alevel}]"; fi ;;
+    --minimal)
+        if $is_active; then out="[${session}:${slevel}✓]"
+        else out="[${session}:${slevel}→${alevel}]"; fi ;;
+    --visual)
+        d=$(dots "$alevel")
+        if $is_active; then out="[${session}:L${slevel} ✓] [${d}]"
+        else out="[${session}:L${slevel}→L${alevel}] [${d}]"; fi ;;
+    *)
+        if $is_active; then out="[${session}:L${slevel} ✓]"
+        else out="[${session}:L${slevel}→L${alevel}]"; fi ;;
+esac
 
-main "$@"
+# Colorize: mint green (active) / soft blue (passthrough)
+if $is_active; then
+    echo "#[fg=colour156]${out}#[default]"
+else
+    echo "#[fg=colour67]${out}#[default]"
+fi
