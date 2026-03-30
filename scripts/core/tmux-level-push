@@ -1,15 +1,18 @@
 #!/bin/bash
 # tmux-level-push — push current pane into a new deeper-level session
-# Bind to prefix+D: bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push"
+#
+# Bind in tmux.conf (passes pane context via format strings):
+#   bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push '#{pane_id}' '#S' '#{pane_current_path}'"
 
 set -euo pipefail
 source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-pane_id=$(tmux display-message -p '#{pane_id}')
-session=$(tmux display-message -p '#S')
+pane_id="${1:?usage: tmux-level-push PANE_ID SESSION_NAME [DIR]}"
+session="${2:?usage: tmux-level-push PANE_ID SESSION_NAME [DIR]}"
+dir="${3:-/tmp}"
+
 level=$(detect_session_level "$session")
 next=$(( (level % 9) + 1 ))
-dir=$(tmux display-message -p '#{pane_current_path}')
 
 # Pick a unique session name
 new="${session}-L${next}"
@@ -32,5 +35,5 @@ tmux join-pane -t "${new}:" -s "$pane_id"
 # Kill the throwaway shell pane
 tmux kill-pane -t "$throwaway"
 
-# Switch to the new session
+# Switch client to the new session
 tmux switch-client -t "$new"
