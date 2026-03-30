@@ -1,8 +1,8 @@
 #!/bin/bash
-# tmux-level-push — nest a deeper-level tmux session inside the current pane
+# tmux-level-push — push current pane into a nested deeper-level session
 #
-# Replaces the current pane's process with a nested tmux session at level+1.
-# Detach from the nested session to return to a shell.
+# Preserves the original process: swaps it into the nested session,
+# then replaces the outer pane with a nested tmux client (portal).
 #
 # Bind in tmux.conf:
 #   bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push '#{pane_id}' '#S'"
@@ -16,7 +16,7 @@ session="${2:?usage: tmux-level-push PANE_ID SESSION_NAME}"
 level=$(detect_session_level "$session")
 next=$(( (level % 9) + 1 ))
 
-# Pick unique session name
+# Unique session name
 new="${session}-L${next}"
 n=0
 while tmux has-session -t "$new" 2>/dev/null; do
@@ -24,7 +24,14 @@ while tmux has-session -t "$new" 2>/dev/null; do
     new="${session}-L${next}-${n}"
 done
 
-# Replace the pane's process with a nested tmux session.
-# -k kills the current process; when user detaches, falls back to $SHELL.
-tmux respawn-pane -t "$pane_id" -k \
-    "TMUX='' tmux new-session -e MT_LEVEL=${next} -s '${new}'; exec \$SHELL"
+# 1. Create nested session (detached, with throwaway shell)
+tmux new-session -d -s "$new" -e MT_LEVEL=$next
+sleep 0.3
+throwaway=$(tmux list-panes -t "${new}:" -F '#{pane_id}' | head -1)
+
+# 2. Swap: our pane goes into the nested session, throwaway comes to our position
+tmux swap-pane -s "$pane_id" -t "$throwaway"
+
+# 3. Replace the throwaway (now at our old position) with a nested tmux client
+tmux respawn-pane -t "$throwaway" -k \
+    "TMUX='' tmux attach -t '${new}'; exec \$SHELL"
