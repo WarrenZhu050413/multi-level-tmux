@@ -53,7 +53,7 @@ source ~/.zshrc
 chmod +x ~/.local/bin/tmux-multilevel/*
 
 # Reinstall if missing
-cd delightful-multilevel-tmux
+cd multi-level-tmux
 ./install.sh
 ```
 
@@ -403,7 +403,7 @@ rm -f ~/.tmux_level_state
 # Manually edit ~/.tmux.conf and remove the multilevel section
 
 # Reinstall
-git clone https://github.com/WarrenZhu050413/delightful-multilevel-tmux.git
-cd delightful-multilevel-tmux
+git clone https://github.com/WarrenZhu050413/multi-level-tmux.git
+cd multi-level-tmux
 ./install.sh
 ```

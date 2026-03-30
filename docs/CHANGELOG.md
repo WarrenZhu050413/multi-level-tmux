@@ -158,8 +158,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ### Development Setup
 ```bash
-git clone https://github.com/WarrenZhu050413/delightful-multilevel-tmux.git
-cd delightful-multilevel-tmux
+git clone https://github.com/WarrenZhu050413/multi-level-tmux.git
+cd multi-level-tmux
 ./install.sh --dev  # Installs with symlinks for development
 ```
 
@@ -174,6 +174,6 @@ cd delightful-multilevel-tmux
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/WarrenZhu050413/delightful-multilevel-tmux/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/WarrenZhu050413/delightful-multilevel-tmux/discussions)
-- **Wiki**: [Documentation Wiki](https://github.com/WarrenZhu050413/delightful-multilevel-tmux/wiki)
+- **Issues**: [GitHub Issues](https://github.com/WarrenZhu050413/multi-level-tmux/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/WarrenZhu050413/multi-level-tmux/discussions)
+- **Wiki**: [Documentation Wiki](https://github.com/WarrenZhu050413/multi-level-tmux/wiki)

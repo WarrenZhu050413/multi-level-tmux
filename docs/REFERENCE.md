@@ -263,7 +263,7 @@ worktree-tmux frontend 5         # "frontend" namespace, Level 5
 
 ### Project Files
 ```
-delightful-multilevel-tmux/
+multi-level-tmux/
 ├── install.sh            # Installation script
 ├── tmux.conf            # Example configuration
 ├── scripts/             # Source scripts
