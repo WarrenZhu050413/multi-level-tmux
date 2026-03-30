@@ -1,20 +1,22 @@
 #!/bin/bash
-# tmux-level-push — push current pane into a new deeper-level session
+# tmux-level-push — nest a deeper-level tmux session inside the current pane
 #
-# Bind in tmux.conf (passes pane context via format strings):
-#   bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push '#{pane_id}' '#S' '#{pane_current_path}'"
+# The pane stays in the original session but now displays a nested tmux
+# at level+1. Detach from the nested session to return to the outer shell.
+#
+# Bind in tmux.conf:
+#   bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push '#{pane_id}' '#S'"
 
 set -euo pipefail
 source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
-pane_id="${1:?usage: tmux-level-push PANE_ID SESSION_NAME [DIR]}"
-session="${2:?usage: tmux-level-push PANE_ID SESSION_NAME [DIR]}"
-dir="${3:-/tmp}"
+pane_id="${1:?usage: tmux-level-push PANE_ID SESSION_NAME}"
+session="${2:?usage: tmux-level-push PANE_ID SESSION_NAME}"
 
 level=$(detect_session_level "$session")
 next=$(( (level % 9) + 1 ))
 
-# Pick a unique session name
+# Pick unique session name
 new="${session}-L${next}"
 n=0
 while tmux has-session -t "$new" 2>/dev/null; do
@@ -22,18 +24,5 @@ while tmux has-session -t "$new" 2>/dev/null; do
     new="${session}-L${next}-${n}"
 done
 
-# Create deeper session (detached, with throwaway shell pane)
-tmux new-session -d -s "$new" -e MT_LEVEL=$next -c "$dir"
-sleep 0.3
-
-# Remember the throwaway pane so we can kill it after
-throwaway=$(tmux list-panes -t "${new}:" -F '#{pane_id}' | head -1)
-
-# Move our pane into the new session
-tmux join-pane -t "${new}:" -s "$pane_id"
-
-# Kill the throwaway shell pane
-tmux kill-pane -t "$throwaway"
-
-# Switch client to the new session
-tmux switch-client -t "$new"
+# Launch nested tmux session inside the current pane
+tmux send-keys -t "$pane_id" "unset TMUX && tmux new-session -e MT_LEVEL=${next} -s '${new}'" Enter
