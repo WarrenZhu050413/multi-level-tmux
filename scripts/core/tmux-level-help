@@ -11,7 +11,7 @@ else
     SECONDARY_PREFIX="C-a"
 fi
 
-current_level=$(tmux show-option -gv @current_level 2>/dev/null || echo "1")
+current_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
 
 # Extract the key letter from the prefix (e.g., C-x -> x, M-a -> a)
 primary_key="${PRIMARY_PREFIX#*-}"
@@ -22,9 +22,9 @@ echo "Primary Prefix: $PRIMARY_PREFIX (active sessions)"
 echo "Secondary Prefix: $SECONDARY_PREFIX (passthrough)"
 echo ""
 echo "ESCAPE COMMANDS:"
-echo "  $PRIMARY_PREFIX !        → Jump to Level 1"  
+echo "  $PRIMARY_PREFIX !        → Jump to Level 1"
 echo "  Ctrl+B          → Up one level"
-echo "  Ctrl+V          → Down one level"
+echo "  Ctrl+N          → Down one level"
 echo "  $PRIMARY_PREFIX x        → Copy mode (preserved)"
 echo ""
 echo "DIRECT JUMPS:"

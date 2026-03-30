@@ -175,7 +175,7 @@ tmux set-option -t "$session_name" status-right "#(TMUX_SESSION=#S ~/.local/bin/
 # Set up the prefix key based on level (assuming level determines active/passive mode)
 # Get the current active level to determine if this new session should be active
 if [[ -n "${TMUX:-}" ]]; then
-    current_active_level=$(tmux show-option @session_level 2>/dev/null | cut -d' ' -f2 || echo "1")
+    current_active_level=$(tmux show-option -gv @active_level 2>/dev/null || echo "1")
     if [[ "$new_level" == "$current_active_level" ]]; then
         # Active mode
         tmux set-option -t "$session_name" prefix $PRIMARY_PREFIX

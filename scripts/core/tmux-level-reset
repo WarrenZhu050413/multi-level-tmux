@@ -18,6 +18,7 @@ main() {
     # Force reset to Level 1 (primary prefix, root key-table)
     tmux set-option -g prefix $PRIMARY_PREFIX 2>/dev/null || true
     tmux set-option -g key-table root 2>/dev/null || true
+    tmux set-option -g @active_level 1 2>/dev/null || true
     tmux set-option -g @current_level 1 2>/dev/null || true
     
     # Clear any status bar overrides

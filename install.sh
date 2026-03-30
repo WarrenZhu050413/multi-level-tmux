@@ -198,7 +198,7 @@ run-shell "tmux setenv -g TMUX_VERSION \$(tmux -V | cut -c 6-)"
 #
 # QUICK REFERENCE:
 #   • Direct jumps: $primary_prefix then !@#\$%^&*(  → Jump to Levels 1-9
-#   • Sequential:   Ctrl+V (down level), Ctrl+B (up level)  
+#   • Sequential:   Ctrl+N (down level), Ctrl+B (up level)
 #   • Emergency:    $primary_prefix !  → Reset to Level 1
 #   • Help:         Run \`tmux-level-help\` for current level info
 #
@@ -224,13 +224,13 @@ bind '*' run-shell '~/.local/bin/tmux-multilevel/core/tmux-goto-level 8'
 bind '(' run-shell '~/.local/bin/tmux-multilevel/core/tmux-goto-level 9'
 
 # Sequential navigation bindings
-# Ctrl+V = go down one level, Ctrl+B = go up one level (with wraparound)
-bind -T root C-v run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-down"
+# Ctrl+N = go down one level, Ctrl+B = go up one level (with wraparound)
+bind -T root C-n run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-down"
 bind -T root C-b run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-up"
 
 # Off key-table bindings (for passthrough sessions)
 # These allow navigation even when session is in passthrough mode
-bind -T off C-v run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-down"
+bind -T off C-n run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-down"
 bind -T off C-b run-shell "\$HOME/.local/bin/tmux-multilevel/core/tmux-level-up"
 
 # Session persistence hook - restores level state on new sessions

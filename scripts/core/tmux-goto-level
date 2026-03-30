@@ -81,13 +81,13 @@ main() {
             # ACTIVATE: This session should respond to tmux commands
             if tmux set-option -t "$session_name" prefix $PRIMARY_PREFIX 2>/dev/null && \
                tmux set-option -t "$session_name" key-table root 2>/dev/null; then
-                ((activated_count++))
+                activated_count=$((activated_count + 1))
             fi
         else
             # PASSTHROUGH: This session uses secondary prefix to avoid conflicts with active sessions
             if tmux set-option -t "$session_name" prefix $SECONDARY_PREFIX 2>/dev/null && \
                tmux set-option -t "$session_name" key-table off 2>/dev/null; then
-                ((passthrough_count++))
+                passthrough_count=$((passthrough_count + 1))
             fi
         fi
     done < <(tmux list-sessions -F '#S' 2>/dev/null || true)

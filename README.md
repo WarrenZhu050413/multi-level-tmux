@@ -84,7 +84,7 @@ Using your configured primary prefix (default: Ctrl+X):
 <prefix> $  → Level 4        <prefix> (  → Level 9
 <prefix> %  → Level 5
 
-Ctrl+V      → Next level     Ctrl+B      → Previous level
+Ctrl+N      → Next level     Ctrl+B      → Previous level
 ```
 
 ### Create Level-Aware Sessions
