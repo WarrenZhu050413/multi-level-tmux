@@ -1,8 +1,8 @@
 #!/bin/bash
 # tmux-level-push — nest a deeper-level tmux session inside the current pane
 #
-# The pane stays in the original session but now displays a nested tmux
-# at level+1. Detach from the nested session to return to the outer shell.
+# Replaces the current pane's process with a nested tmux session at level+1.
+# Detach from the nested session to return to a shell.
 #
 # Bind in tmux.conf:
 #   bind D run-shell "~/.local/bin/tmux-multilevel/core/tmux-level-push '#{pane_id}' '#S'"
@@ -24,5 +24,7 @@ while tmux has-session -t "$new" 2>/dev/null; do
     new="${session}-L${next}-${n}"
 done
 
-# Launch nested tmux session inside the current pane
-tmux send-keys -t "$pane_id" "unset TMUX && tmux new-session -e MT_LEVEL=${next} -s '${new}'" Enter
+# Replace the pane's process with a nested tmux session.
+# -k kills the current process; when user detaches, falls back to $SHELL.
+tmux respawn-pane -t "$pane_id" -k \
+    "TMUX='' tmux new-session -e MT_LEVEL=${next} -s '${new}'; exec \$SHELL"
