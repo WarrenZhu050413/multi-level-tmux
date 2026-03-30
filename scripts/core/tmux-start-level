@@ -1,70 +1,68 @@
 #!/bin/bash
-# tmux-start-level — Start tmux session with level identity (1-9)
-# Usage: tmux-start-level [level] [tmux-new-session-options...]
+# tmux-start-level — create a multilevel tmux session
+#
+# Thin wrapper around tmux new-session that handles nesting.
+# All the real work (prefix, key-table) is done by the session-created hook.
+#
+# From inside tmux: auto-increments from parent level, unsets $TMUX
+# From outside tmux: defaults to level 1
+# Explicit: tmux-start-level 3 -s backend
+# Or plain: tmux new-session -e MT_LEVEL=3 -s backend  (no wrapper needed)
 
 set -euo pipefail
 source "$HOME/.local/bin/tmux-multilevel/lib.sh"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     cat << 'EOF'
-tmux-start-level — Start tmux session with level identity (1-9)
+tmux-start-level — create a multilevel tmux session
 
 USAGE:
-    tmux-start-level [level] [tmux-options...]
+    tmux-start-level [level] [tmux-new-session-options...]
+
+    Or skip this script entirely:
+    tmux new-session -e MT_LEVEL=3 -s myproject
 
 ARGUMENTS:
-    level           Session level (1-9); auto-increments from parent if omitted
-    tmux-options    Any flags for 'tmux new-session'
+    level    Session level (1-9). Auto-increments from parent if omitted.
+    Rest     Passed through to tmux new-session.
 
 EXAMPLES:
-    tmux-start-level                           # Auto-select next level
-    tmux-start-level 1                         # Basic Level 1 session
-    tmux-start-level 2 -s project              # Named Level 2 session
-    tmux-start-level 3 -s work -c ~/projects   # Level 3, named, specific dir
-    tmux-start-level -s myproject              # Auto-level with session name
-
-NOTES:
-    - Sessions start in passthrough mode; use navigation to activate
-    - Use prefix + !@#$%^&*( to navigate to levels 1-9
+    tmux-start-level                    # Auto: parent+1 (or 1 if outside tmux)
+    tmux-start-level 3 -s backend      # Explicit level 3
+    tmux-start-level -s myproject      # Auto level, named session
 EOF
     exit 0
 fi
 
-# Auto-detect next level from parent session
-find_next_level() {
-    local parent=0
-    if [[ -n "${TMUX:-}" ]]; then
-        local session
-        session=$(tmux display-message -p '#S' 2>/dev/null || echo '')
-        if [[ -n "$session" ]]; then
-            local detected
-            detected=$(detect_session_level "$session")
-            [[ "$detected" =~ ^[1-9]$ ]] && parent="$detected"
-        fi
-    fi
-    echo $(( (parent % 9) + 1 ))
-}
-
-# Parse level: explicit first arg, or auto-increment
+# Parse level: bare digit as first arg, or auto-detect
+level=""
 if [[ $# -gt 0 && "$1" =~ ^[1-9]$ ]]; then
     level="$1"; shift
-else
-    level=$(find_next_level)
-    echo "Auto-selecting Level $level"
 fi
 
-# Determine prefix based on current active level
-current_active=$(active_level)
-if [[ "$level" -eq "$current_active" ]]; then
-    prefix="$PRIMARY_PREFIX"; table="root"
-    echo "Starting Level $level session (ACTIVE)"
-else
-    prefix="$SECONDARY_PREFIX"; table="off"
-    echo "Starting Level $level session (passthrough)"
+# Check if user already passed -e MT_LEVEL=... in remaining args
+mt_in_args=false
+for arg in "$@"; do
+    [[ "$arg" == MT_LEVEL=* ]] && mt_in_args=true
+done
+
+# Auto-detect level from parent session
+if [[ -z "$level" ]] && ! $mt_in_args; then
+    if [[ -n "${TMUX:-}" ]]; then
+        parent=$(detect_session_level "$(tmux display-message -p '#S' 2>/dev/null)")
+        level=$(( (parent % 9) + 1 ))
+    else
+        level=1
+    fi
 fi
 
-exec tmux new-session "$@" \; \
-    set-option @session_level "$level" \; \
-    set-option status-right "#(TMUX_SESSION=#S $DMT_DIR/core/tmux-level-status --visual) #{?client_prefix,[ACTIVE],} | %l:%M%p" \; \
-    set-option prefix "$prefix" \; \
-    set-option key-table "$table"
+# Build MT_LEVEL arg (unless user already provided it)
+mt_args=()
+if [[ -n "$level" ]] && ! $mt_in_args; then
+    mt_args=(-e "MT_LEVEL=$level")
+fi
+
+# Unset TMUX to allow nesting — this is the whole point of multi-level-tmux
+unset TMUX
+
+exec tmux new-session "${mt_args[@]}" "$@"

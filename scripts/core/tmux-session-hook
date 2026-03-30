@@ -1,0 +1,27 @@
+#!/bin/bash
+# tmux-session-hook — called by session-created hook
+# Reads MT_LEVEL env var from new session, sets @session_level + prefix/key-table.
+# Normal sessions (no MT_LEVEL) are completely unaffected.
+#
+# Usage (from tmux hook): run-shell "~/.local/bin/tmux-multilevel/core/tmux-session-hook #{hook_session_name}"
+
+set -euo pipefail
+source "$HOME/.local/bin/tmux-multilevel/lib.sh"
+
+session="${1:-}"
+[[ -n "$session" ]] || exit 0
+
+# Read MT_LEVEL env var from the new session
+raw=$(tmux show-environment -t "$session" MT_LEVEL 2>/dev/null) || exit 0
+level="${raw#MT_LEVEL=}"
+
+# Validate: must be 1-9
+[[ "$level" =~ ^[1-9]$ ]] || exit 0
+
+# Set session level and clean up the env var
+tmux set-option -t "$session" @session_level "$level"
+tmux set-environment -t "$session" -u MT_LEVEL 2>/dev/null || true
+
+# Re-evaluate all sessions (sets correct prefix/key-table for the new session)
+active=$(active_level)
+exec "$DMT_DIR/core/tmux-goto-level" "$active"
