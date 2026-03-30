@@ -21,7 +21,7 @@ EOF
     exit 0
 fi
 
-session="${TMUX_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || echo default)}"
+session="${2:-${TMUX_SESSION:-$(tmux display-message -p '#S' 2>/dev/null || echo default)}}"
 slevel=$(detect_session_level "$session")
 alevel=$(active_level)
 is_active=$([[ "$slevel" == "$alevel" ]] && echo true || echo false)
