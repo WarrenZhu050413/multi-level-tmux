@@ -48,12 +48,12 @@ bind C-a send-prefix
 
 #### Using Ctrl+J/K Instead of Ctrl+V/B
 
-If Ctrl+V conflicts with paste or Ctrl+B with your existing prefix:
+If Ctrl+V conflicts with paste or Ctrl+P with your existing prefix:
 
 **🔍 Find these lines:**
 ```bash
 bind -T root C-v run-shell '~/.local/bin/tmux-multilevel/tmux-level-down'
-bind -T root C-b run-shell '~/.local/bin/tmux-multilevel/tmux-level-up'
+bind -T root C-p run-shell'
 ```
 
 **✏️ Change to:**
@@ -124,7 +124,7 @@ bind F2 run-shell '~/.local/bin/tmux-multilevel/tmux-goto-level 2'
 | `Ctrl+X *` | Jump to Level 8 |
 | `Ctrl+X (` | Jump to Level 9 |
 | `Ctrl+V` | Go down one level |
-| `Ctrl+B` | Go up one level |
+| `Ctrl+P` | Go up one level |
 
 ### Easy Substitution Patterns
 | Component | Find | Replace With | Example |
@@ -204,8 +204,8 @@ tmux list-keys | grep "!"
 bind -T root C-j run-shell '~/.local/bin/tmux-multilevel/tmux-level-down'
 ```
 
-#### Ctrl+B (Prefix Conflict)  
-**Problem:** `Ctrl+B` is the default tmux prefix.
+#### Ctrl+P (Prefix Conflict)  
+**Problem:** `Ctrl+P` is the default tmux prefix.
 **Solution:** Use `Ctrl+K` for up navigation:
 ```bash
 bind -T root C-k run-shell '~/.local/bin/tmux-multilevel/tmux-level-up'

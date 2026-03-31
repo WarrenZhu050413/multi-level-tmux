@@ -15,7 +15,7 @@ Ctrl+X !
 tmux-level-reset
 
 # Option 3: Sequential navigation
-Ctrl+B  # Repeat until at Level 1
+Ctrl+P  # Repeat until at Level 1
 
 # Option 4: Check current level and navigate
 tmux-level-help  # Shows current level and options

@@ -12,7 +12,7 @@ Secondary Prefix: $SECONDARY_PREFIX (passthrough)
 
 NAVIGATION:
   $PRIMARY_PREFIX !       → Jump to Level 1
-  Ctrl+B         → Up one level
+  Ctrl+P         → Up one level
   Ctrl+N         → Down one level
   $PRIMARY_PREFIX x       → Copy mode
 

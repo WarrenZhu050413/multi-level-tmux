@@ -39,7 +39,7 @@ Jump instantly to any level using `Ctrl+X` followed by:
 Move through levels one at a time:
 
 - **`Ctrl+V`**: Go down one level (1→2→3...→9→1)
-- **`Ctrl+B`**: Go up one level (9→8→7...→1→9)
+- **`Ctrl+P`**: Go up one level (9→8→7...→1→9)
 
 These work from both active and passthrough sessions without prefix.
 
@@ -161,8 +161,8 @@ Ctrl+X #  # Production
 # Working at Level 3
 Ctrl+V    # Down to Level 4
 Ctrl+V    # Down to Level 5
-Ctrl+B    # Back up to Level 4
-Ctrl+B    # Back up to Level 3
+Ctrl+P    # Back up to Level 4
+Ctrl+P    # Back up to Level 3
 
 # Jump directly where needed
 Ctrl+X &  # Straight to Level 7

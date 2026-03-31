@@ -157,7 +157,7 @@ DIRECT JUMPS (Ctrl+X then...):
 
 SEQUENTIAL NAVIGATION:
   Ctrl+V → Next level (→ Level 4)
-  Ctrl+B → Previous level (→ Level 2)
+  Ctrl+P → Previous level (→ Level 2)
 
 EMERGENCY: Ctrl+X ! returns to Level 1
 ```

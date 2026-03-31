@@ -52,7 +52,7 @@ tmux-goto-level 2
 # Navigation
 <prefix> !@#$%^&*(         # jump to level 1-9 directly
 Ctrl+N                      # next level (wraps 9→1)
-Ctrl+B                      # previous level (wraps 1→9)
+Ctrl+P                      # previous level (wraps 1→9)
 
 # Session management
 tmux-start-level [1-9] [tmux-opts...]   # create session at level
